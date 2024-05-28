@@ -67,8 +67,19 @@ at :: Double -> Ray -> Point
 at t x = (x ^. orig) + t *^ (x ^. dir)
 
 
+hitSphare :: Point -> Double -> Ray -> Bool
+hitSphare center r x = b' ^ (2 :: Int) - a * c > 0
+  where
+    oc = center - (x ^. orig)
+    a = quadrance (x ^. dir)
+    b' = norm $ (x ^. dir) * oc
+    c = quadrance oc - r ^ (2 :: Int)
+
+
 rayColor :: Ray -> Color
-rayColor r = (1.0 - a) *^ V3 1 1 1 + a *^ V3 0.5 0.7 1
+rayColor r
+  | hitSphare (V3 0 0 (-1)) 0.5 r = V3 1 0 0
+  | otherwise = (1.0 - a) *^ V3 1 1 1 + a *^ V3 0.5 0.7 1
   where
     a = 0.5 * ((signorm (r ^. dir) ^. _y) + 1.0)
 
