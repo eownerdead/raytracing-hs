@@ -1,0 +1,27 @@
+cabal-version: 3.4
+name: raytracing
+version: 0.1.0.0
+homepage: https://codeberg.org/eownerdead/raytracing-hs
+license: 0BSD
+license-file: LICENSE.md
+author: EOWNERDEAD
+maintainer: eownerdead@disroot.o
+build-type: Simple
+
+common common
+    default-language: GHC2021
+    default-extensions:
+        NoImplicitPrelude,
+        OverloadedStrings,
+        TemplateHaskell,
+    ghc-options: -Wall
+    build-depends:
+        relude ^>=1.2.1.0,
+        base ^>=4.17.2.1,
+
+executable raytracing
+    import: common
+    main-is: raytracing.hs
+    build-depends:
+        linear ^>=1.22,
+        lens ^>=5.2.3,

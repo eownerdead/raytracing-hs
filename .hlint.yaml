@@ -1,0 +1,6 @@
+- group:
+    name: future
+    enabled: true
+- group:
+    name: generalise
+    enabled: true

@@ -7,11 +7,23 @@
   outputs = { self, nixpkgs, utils }:
     utils.lib.eachDefaultSystem (system:
       let pkgs = import nixpkgs { inherit system; };
-      in {
+      in rec {
         formatter = pkgs.nixfmt;
 
-        devShells.default = pkgs.mkShell {
-          packages = with pkgs; [ editorconfig-checker nixfmt ];
+        packages.raytracing = pkgs.haskellPackages.developPackage {
+          root = ./.;
+          returnShellEnv = true;
+          withHoogle = false;
         };
+
+        devShells.default = packages.raytracing.overrideAttrs (old: {
+          nativeBuildInputs = old.nativeBuildInputs ++ (with pkgs; [
+            editorconfig-checker
+            nixfmt
+            cabal-install
+            hlint
+            haskellPackages.fourmolu
+          ]);
+        });
       });
 }

@@ -1,0 +1,11 @@
+indentation: 2
+column-limit: 80
+haddock-style: single-line
+import-export-style: leading
+indent-wheres: true
+newlines-between-decls: 2
+in-style: no-space
+single-constraint-parens: never
+single-deriving-parens: never
+unicode: never
+respectful: false
