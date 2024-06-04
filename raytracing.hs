@@ -19,6 +19,69 @@ data Ray = Ray {_orig :: Point, _dir :: V3 Double}
 $(makeLenses ''Ray)
 
 
+data Hit = Hit
+  {_pHit :: Point, _normal :: V3 Double, _tHit :: Double, _frontFace :: Bool}
+
+
+$(makeLenses ''Hit)
+
+
+class Hittable a where
+  hit :: Double -> Double -> a -> Ray -> Maybe Hit
+
+
+data Sphere = Sphere {_center :: Point, _radius :: Double}
+
+
+$(makeLenses ''Sphere)
+
+
+instance Hittable Sphere where
+  hit tmin tmax x r
+    | d < 0 = Nothing
+    | tmin < t1 && t1 < tmax = hit' t1
+    | tmin < t2 && t2 < tmax = hit' t2
+    | otherwise = Nothing
+    where
+      oc = (x ^. center) - (r ^. orig)
+
+      -- Quadratic formula
+      a = quadrance (r ^. dir)
+      b' = (r ^. dir) `dot` oc
+      c = quadrance oc - (x ^. radius) ^ (2 :: Int)
+      d = b' ^ (2 :: Int) - a * c
+
+      t1 = (b' - sqrt d) / a
+      t2 = (b' + sqrt d) / a
+
+      hit' :: Double -> Maybe Hit
+      hit' t =
+        Just
+          $ Hit
+            { _pHit = p
+            , _tHit = t
+            , _frontFace = ff
+            , _normal = if ff then outwardNormal else -outwardNormal
+            }
+        where
+          p = rayAt t r
+          outwardNormal = signorm $ p - (x ^. center)
+          ff = (r ^. dir) `dot` outwardNormal < 0
+
+
+instance Hittable a => Hittable [a] where
+  hit _ _ [] _ = Nothing
+  hit tmin tmax (x : xs) r
+    | Just hx <- hit tmin (maybe tmax (^. tHit) h) xs r = Just hx
+    | otherwise = h
+    where
+      h = hit tmin tmax x r
+
+
+world :: [Sphere]
+world = [Sphere (V3 0 0 (-1)) 0.5, Sphere (V3 0 (-100.5) (-1)) 100]
+
+
 aspectRatio :: Double
 aspectRatio = 16.0 / 9.0
 
@@ -63,22 +126,17 @@ p00 :: Point
 p00 = upperLeft + 0.5 * (deltaU + deltaV)
 
 
-at :: Double -> Ray -> Point
-at t x = (x ^. orig) + t *^ (x ^. dir)
+infinity :: Double
+infinity = 1 / 0
 
 
-hitSphare :: Point -> Double -> Ray -> Bool
-hitSphare center r x = b' ^ (2 :: Int) - a * c > 0
-  where
-    oc = center - (x ^. orig)
-    a = quadrance (x ^. dir)
-    b' = norm $ (x ^. dir) * oc
-    c = quadrance oc - r ^ (2 :: Int)
+rayAt :: Double -> Ray -> Point
+rayAt t x = (x ^. orig) + t *^ (x ^. dir)
 
 
-rayColor :: Ray -> Color
-rayColor r
-  | hitSphare (V3 0 0 (-1)) 0.5 r = V3 1 0 0
+rayColor :: Hittable a => a -> Ray -> Color
+rayColor xs r
+  | Just x <- hit 0 infinity xs r = 0.5 *^ ((x ^. normal) + V3 1 1 1)
   | otherwise = (1.0 - a) *^ V3 1 1 1 + a *^ V3 0.5 0.7 1
   where
     a = 0.5 * ((signorm (r ^. dir) ^. _y) + 1.0)
@@ -96,4 +154,4 @@ main = do
   forM_ ((,) <$> [0 .. (ph - 1)] <*> [0 .. (pw - 1)]) $ \(j, i) -> do
     let pixelCenter = p00 + (fromIntegral i *^ deltaU) + (fromIntegral j *^ deltaV)
     let rayDir = pixelCenter - camera
-    putTextLn $ toColor $ rayColor $ Ray camera rayDir
+    putTextLn $ toColor $ rayColor world (Ray camera rayDir)
