@@ -10,7 +10,7 @@ import Relude
 type Point = V3 Double -- Point of the viewport.
 
 
-type Color = V3 Double -- (r, g, b)
+newtype Color = Color (V3 Double) -- (r, g, b)
 
 
 data Ray = Ray {_orig :: Point, _dir :: V3 Double}
@@ -136,14 +136,14 @@ rayAt t x = (x ^. orig) + t *^ (x ^. dir)
 
 rayColor :: Hittable a => a -> Ray -> Color
 rayColor xs r
-  | Just x <- hit 0 infinity xs r = 0.5 *^ ((x ^. normal) + V3 1 1 1)
-  | otherwise = (1.0 - a) *^ V3 1 1 1 + a *^ V3 0.5 0.7 1
+  | Just x <- hit 0 infinity xs r = Color $ 0.5 *^ ((x ^. normal) + V3 1 1 1)
+  | otherwise = Color $ (1.0 - a) *^ V3 1 1 1 + a *^ V3 0.5 0.7 1
   where
     a = 0.5 * ((signorm (r ^. dir) ^. _y) + 1.0)
 
 
 toColor :: Color -> Text
-toColor x = unwords $ fmap (\y -> show (floor $ 255.999 * (x ^. y) :: Int)) [_x, _y, _z]
+toColor (Color x) = unwords $ fmap (\y -> show (floor $ 255.999 * (x ^. y) :: Int)) [_x, _y, _z]
 
 
 main :: IO ()
