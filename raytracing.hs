@@ -13,6 +13,9 @@ type Point = V3 Double -- Point of the viewport.
 newtype Color = Color (V3 Double) -- (r, g, b)
 
 
+type Time = Double
+
+
 data Ray = Ray {_orig :: Point, _dir :: V3 Double}
 
 
@@ -20,14 +23,14 @@ $(makeLenses ''Ray)
 
 
 data Hit = Hit
-  {_pHit :: Point, _normal :: V3 Double, _tHit :: Double, _frontFace :: Bool}
+  {_pHit :: Point, _normal :: V3 Double, _tHit :: Time, _frontFace :: Bool}
 
 
 $(makeLenses ''Hit)
 
 
 class Hittable a where
-  hit :: Double -> Double -> a -> Ray -> Maybe Hit
+  hit :: Time -> Time -> a -> Ray -> Maybe Hit
 
 
 data Sphere = Sphere {_center :: Point, _radius :: Double}
@@ -54,7 +57,7 @@ instance Hittable Sphere where
       t1 = (b' - sqrt d) / a
       t2 = (b' + sqrt d) / a
 
-      hit' :: Double -> Maybe Hit
+      hit' :: Time -> Maybe Hit
       hit' t =
         Just
           $ Hit
@@ -130,7 +133,7 @@ infinity :: Double
 infinity = 1 / 0
 
 
-rayAt :: Double -> Ray -> Point
+rayAt :: Time -> Ray -> Point
 rayAt t x = (x ^. orig) + t *^ (x ^. dir)
 
 
