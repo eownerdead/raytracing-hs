@@ -16,6 +16,24 @@ newtype Color = Color (V3 Double) -- (r, g, b)
 type Time = Double
 
 
+data Interval = Interval {_inf :: Double, _sup :: Double}
+
+
+$(makeLenses ''Interval)
+
+
+len :: Interval -> Double
+len i = (i ^. sup) - (i ^. inf)
+
+
+contains :: Double -> Interval -> Bool
+contains x i = (i ^. inf) <= x && x <= (i ^. sup)
+
+
+surrounds :: Double -> Interval -> Bool
+surrounds x i = (i ^. inf) < x && x < (i ^. sup)
+
+
 data Ray = Ray {_orig :: Point, _dir :: V3 Double}
 
 
@@ -30,7 +48,7 @@ $(makeLenses ''Hit)
 
 
 class Hittable a where
-  hit :: Time -> Time -> a -> Ray -> Maybe Hit
+  hit :: Interval -> a -> Ray -> Maybe Hit
 
 
 data Sphere = Sphere {_center :: Point, _radius :: Double}
@@ -40,10 +58,10 @@ $(makeLenses ''Sphere)
 
 
 instance Hittable Sphere where
-  hit tmin tmax x r
+  hit i x r
     | d < 0 = Nothing
-    | tmin < t1 && t1 < tmax = hit' t1
-    | tmin < t2 && t2 < tmax = hit' t2
+    | surrounds t1 i = hit' t1
+    | surrounds t2 i = hit' t2
     | otherwise = Nothing
     where
       oc = (x ^. center) - (r ^. orig)
@@ -73,12 +91,12 @@ instance Hittable Sphere where
 
 
 instance Hittable a => Hittable [a] where
-  hit _ _ [] _ = Nothing
-  hit tmin tmax (x : xs) r
-    | Just hx <- hit tmin (maybe tmax (^. tHit) h) xs r = Just hx
+  hit _ [] _ = Nothing
+  hit i (x : xs) r
+    | Just hx <- hit (i & sup .~ maybe (i ^. sup) (^. tHit) h) xs r = Just hx
     | otherwise = h
     where
-      h = hit tmin tmax x r
+      h = hit i x r
 
 
 world :: [Sphere]
@@ -139,7 +157,8 @@ rayAt t x = (x ^. orig) + t *^ (x ^. dir)
 
 rayColor :: Hittable a => a -> Ray -> Color
 rayColor xs r
-  | Just x <- hit 0 infinity xs r = Color $ 0.5 *^ ((x ^. normal) + V3 1 1 1)
+  | Just x <- hit (Interval 0 infinity) xs r =
+      Color $ 0.5 *^ ((x ^. normal) + V3 1 1 1)
   | otherwise = Color $ (1.0 - a) *^ V3 1 1 1 + a *^ V3 0.5 0.7 1
   where
     a = 0.5 * ((signorm (r ^. dir) ^. _y) + 1.0)
