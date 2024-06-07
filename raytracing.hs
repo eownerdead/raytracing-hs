@@ -5,12 +5,14 @@ import Linear.Metric
 import Linear.V3
 import Linear.Vector
 import Relude
+import System.Random.Stateful
 
 
 type Point = V3 Double -- Point of the viewport.
 
 
 newtype Color = Color (V3 Double) -- (r, g, b)
+  deriving (Num, Fractional)
 
 
 type Time = Double
@@ -32,6 +34,13 @@ contains x i = (i ^. inf) <= x && x <= (i ^. sup)
 
 surrounds :: Double -> Interval -> Bool
 surrounds x i = (i ^. inf) < x && x < (i ^. sup)
+
+
+clamp :: Double -> Interval -> Double
+clamp x i
+  | x < i ^. inf = i ^. inf
+  | i ^. sup < x = i ^. sup
+  | otherwise = x
 
 
 data Ray = Ray {_orig :: Point, _dir :: V3 Double}
@@ -151,6 +160,10 @@ infinity :: Double
 infinity = 1 / 0
 
 
+samplesPerPixel :: Int
+samplesPerPixel = 100
+
+
 rayAt :: Time -> Ray -> Point
 rayAt t x = (x ^. orig) + t *^ (x ^. dir)
 
@@ -165,15 +178,27 @@ rayColor xs r
 
 
 toColor :: Color -> Text
-toColor (Color x) = unwords $ fmap (\y -> show (floor $ 255.999 * (x ^. y) :: Int)) [_x, _y, _z]
+toColor (Color x) =
+  unwords
+    $ fmap (\y -> show (floor $ 256 * clamp (x ^. y) intensity :: Int)) [_x, _y, _z]
+  where
+    intensity = Interval{_inf = 0, _sup = 0.999}
+
+
+getRay :: StatefulGen g m => Int -> Int -> g -> m Ray
+getRay i j g = do
+  x <- uniformRM (-0.5, 0.5) g
+  y <- uniformRM (-0.5, 0.5) g
+  let sample = p00 + ((fromIntegral i + x) *^ deltaU) + ((fromIntegral j + y) *^ deltaV)
+  pure $ Ray camera (sample - camera)
 
 
 main :: IO ()
-main = do
+main = runStateGenT_ (mkStdGen 0) $ \g -> do
   putTextLn "P3"
   putTextLn $ show pw <> " " <> show ph
   putTextLn "255"
   forM_ ((,) <$> [0 .. (ph - 1)] <*> [0 .. (pw - 1)]) $ \(j, i) -> do
-    let pixelCenter = p00 + (fromIntegral i *^ deltaU) + (fromIntegral j *^ deltaV)
-    let rayDir = pixelCenter - camera
-    putTextLn $ toColor $ rayColor world (Ray camera rayDir)
+    color <-
+      sum . fmap (rayColor world) <$> replicateM samplesPerPixel (getRay i j g)
+    putTextLn $ toColor $ color / fromIntegral samplesPerPixel

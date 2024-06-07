@@ -25,3 +25,4 @@ executable raytracing
     build-depends:
         linear ^>=1.22,
         lens ^>=5.2.3,
+        random ^>=1.2.1.1,
