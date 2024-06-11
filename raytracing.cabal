@@ -17,7 +17,7 @@ common common
     ghc-options: -Wall
     build-depends:
         relude ^>=1.2.1.0,
-        base ^>=4.17.2.1,
+        base ^>=4.18.2.1,
 
 executable raytracing
     import: common
@@ -25,4 +25,4 @@ executable raytracing
     build-depends:
         linear ^>=1.22,
         lens ^>=5.2.3,
-        random ^>=1.2.1.1,
+        random ^>=1.2.1.2,
