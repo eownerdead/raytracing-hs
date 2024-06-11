@@ -1,6 +1,7 @@
 module Main where
 
 import Control.Lens
+import Data.Text.IO qualified as T
 import Linear.Metric
 import Linear.V3
 import Linear.Vector
@@ -118,8 +119,8 @@ aspectRatio = 16.0 / 9.0
 
 -- Pixel size of a image.
 ph, pw :: Int
-ph = 480
-pw = round $ fromIntegral ph * aspectRatio
+ph = round $ fromIntegral pw / aspectRatio
+pw = 400
 
 
 -- Viewport size.
@@ -164,15 +165,24 @@ samplesPerPixel :: Int
 samplesPerPixel = 100
 
 
+maxDepth :: Int
+maxDepth = 50
+
+
 rayAt :: Time -> Ray -> Point
 rayAt t x = (x ^. orig) + t *^ (x ^. dir)
 
 
-rayColor :: Hittable a => a -> Ray -> Color
-rayColor xs r
-  | Just x <- hit (Interval 0 infinity) xs r =
-      Color $ 0.5 *^ ((x ^. normal) + V3 1 1 1)
-  | otherwise = Color $ (1.0 - a) *^ V3 1 1 1 + a *^ V3 0.5 0.7 1
+rayColor :: (Hittable a, StatefulGen g m) => Int -> a -> Ray -> g -> m Color
+rayColor depth xs r g
+  | depth <= 0 = pure $ Color $ V3 0 0 0
+  | Just x <- hit (Interval 0.001 infinity) xs r = do
+      y <- randUnit g
+      let d = (x ^. normal) + y
+      c <- rayColor (depth-1) xs (Ray (x ^. pHit) d) g
+      pure $ 0.5 * c
+      -- Color $ 0.5 *^ ((x ^. normal) + V3 1 1 1)
+  | otherwise = pure $ Color $ (1.0 - a) *^ V3 1 1 1 + a *^ V3 0.5 0.7 1
   where
     a = 0.5 * ((signorm (r ^. dir) ^. _y) + 1.0)
 
@@ -193,12 +203,25 @@ getRay i j g = do
   pure $ Ray camera (sample - camera)
 
 
+randUnit :: StatefulGen g m => g -> m (V3 Double)
+randUnit g = do
+  x <- uniformRM (0, 1) g
+  y <- uniformRM (0, 1) g
+  z <- uniformRM (0, 1) g
+  let a = V3 x y z
+  if norm a > 0
+    then randUnit g
+    else pure a
+
+
 main :: IO ()
 main = runStateGenT_ (mkStdGen 0) $ \g -> do
   putTextLn "P3"
   putTextLn $ show pw <> " " <> show ph
   putTextLn "255"
-  forM_ ((,) <$> [0 .. (ph - 1)] <*> [0 .. (pw - 1)]) $ \(j, i) -> do
-    color <-
-      sum . fmap (rayColor world) <$> replicateM samplesPerPixel (getRay i j g)
-    putTextLn $ toColor $ color / fromIntegral samplesPerPixel
+  forM_ [0 .. (ph - 1)] $ \j -> do
+    liftIO $ T.hPutStrLn stderr $ "Scanlines remaining: " <> show (ph - j)
+    forM_ [0 .. (pw - 1)] $ \i -> do
+      color <-
+        sum . fmap (rayColor world) <$> replicateM samplesPerPixel (getRay i j g)
+      putTextLn $ toColor $ color / fromIntegral samplesPerPixel
