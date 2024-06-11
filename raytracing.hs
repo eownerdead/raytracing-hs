@@ -169,6 +169,10 @@ maxDepth :: Int
 maxDepth = 50
 
 
+gamma :: Double
+gamma = 2
+
+
 rayAt :: Time -> Ray -> Point
 rayAt t x = (x ^. orig) + t *^ (x ^. dir)
 
@@ -177,11 +181,8 @@ rayColor :: (Hittable a, StatefulGen g m) => Int -> a -> Ray -> g -> m Color
 rayColor depth xs r g
   | depth <= 0 = pure $ Color $ V3 0 0 0
   | Just x <- hit (Interval 0.001 infinity) xs r = do
-      y <- randUnit g
-      let d = (x ^. normal) + y
-      c <- rayColor (depth-1) xs (Ray (x ^. pHit) d) g
-      pure $ 0.5 * c
-      -- Color $ 0.5 *^ ((x ^. normal) + V3 1 1 1)
+      s <- randUnit g
+      (0.1 *) <$> rayColor (depth - 1) xs (Ray (x ^. pHit) ((x ^. normal) + s)) g
   | otherwise = pure $ Color $ (1.0 - a) *^ V3 1 1 1 + a *^ V3 0.5 0.7 1
   where
     a = 0.5 * ((signorm (r ^. dir) ^. _y) + 1.0)
@@ -190,7 +191,8 @@ rayColor depth xs r g
 toColor :: Color -> Text
 toColor (Color x) =
   unwords
-    $ fmap (\y -> show (floor $ 256 * clamp (x ^. y) intensity :: Int)) [_x, _y, _z]
+    $ toList x
+    <&> (\i -> show (floor $ 256 * clamp (i ** (1 / gamma)) intensity :: Int))
   where
     intensity = Interval{_inf = 0, _sup = 0.999}
 
@@ -203,15 +205,16 @@ getRay i j g = do
   pure $ Ray camera (sample - camera)
 
 
+-- rejection method
 randUnit :: StatefulGen g m => g -> m (V3 Double)
 randUnit g = do
   x <- uniformRM (0, 1) g
   y <- uniformRM (0, 1) g
   z <- uniformRM (0, 1) g
   let a = V3 x y z
-  if norm a > 0
+  if norm a > 1
     then randUnit g
-    else pure a
+    else pure $ signorm a
 
 
 main :: IO ()
@@ -223,5 +226,6 @@ main = runStateGenT_ (mkStdGen 0) $ \g -> do
     liftIO $ T.hPutStrLn stderr $ "Scanlines remaining: " <> show (ph - j)
     forM_ [0 .. (pw - 1)] $ \i -> do
       color <-
-        sum . fmap (rayColor world) <$> replicateM samplesPerPixel (getRay i j g)
+        sum
+          <$> replicateM samplesPerPixel (getRay i j g >>= \x -> rayColor maxDepth world x g)
       putTextLn $ toColor $ color / fromIntegral samplesPerPixel
